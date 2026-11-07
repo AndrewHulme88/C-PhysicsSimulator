@@ -1,7 +1,9 @@
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 #include <iostream>
+#include <string>
 
-int main()
+int main(int argc, char *argv[])
 {
 	// Initialize SDL video subsystem
 	if (SDL_Init(SDL_INIT_VIDEO) == 0)
@@ -12,10 +14,11 @@ int main()
 
 	// Create a window
 	SDL_Window* window = SDL_CreateWindow("C++ Physics Simulator", 800, 600, SDL_WINDOW_RESIZABLE);
+	SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
 	
-	if (!window)
+	if (!window || !renderer)
 	{
-		std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
+		std::cerr << "Window/Renderer creation error: " << SDL_GetError() << std::endl;
 		SDL_Quit();
 		return -1;
 	}
@@ -33,13 +36,13 @@ int main()
 		}
 		SDL_Delay(16); // 60 FPS cap
 
-		//SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-		//SDL_RenderClear(renderer);
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+		SDL_RenderClear(renderer);
 
-		//SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-		//SDL_Rect rect = { 200, 150, 400, 300 };
-		//SDL_RenderFillRect(renderer, &rect);
+		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+		SDL_RenderPoint(renderer, 320.0f, 240.0f);
 
+		SDL_RenderPresent(renderer);
 	}
 
 	// Cleanup
