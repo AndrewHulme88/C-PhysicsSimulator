@@ -2,9 +2,54 @@
 #include <SDL3/SDL_main.h>
 #include <iostream>
 #include <string>
+#include <vector>
+
+constexpr int WINDOW_WIDTH = 800;
+constexpr int WINDOW_HEIGHT = 600;
+constexpr int CELL_SIZE = 4;
+constexpr int GRID_WIDTH = WINDOW_WIDTH / CELL_SIZE;
+constexpr int GRID_HEIGHT = WINDOW_HEIGHT / CELL_SIZE;
+
+enum class Material
+{
+	Empty,
+	Sand
+};
+
+void renderGrid(SDL_Renderer* renderer, const std::vector<Material>& grid)
+{
+	for (int y = 0; y < GRID_HEIGHT; y++)
+	{
+		for (int x = 0; x < GRID_WIDTH; x++)
+		{
+			int index = y * GRID_WIDTH + x;
+
+			if (grid[index] == Material::Sand)
+			{
+				float screenX = static_cast<float>(x * CELL_SIZE);
+				float screenY = static_cast<float>(y * CELL_SIZE);
+
+				SDL_FRect rect{
+					screenX,
+					screenY,
+					static_cast<float>(CELL_SIZE),
+					static_cast<float>(CELL_SIZE)
+				};
+
+				SDL_RenderFillRect(renderer, &rect);
+			}
+		}
+	}
+}
 
 int main(int argc, char *argv[])
 {
+	std::vector<Material> grid(GRID_WIDTH * GRID_HEIGHT, Material::Empty);
+
+	grid[30 * GRID_WIDTH + 50] = Material::Sand;
+	grid[50 * GRID_WIDTH + 60] = Material::Sand;
+	grid[55 * GRID_WIDTH + 60] = Material::Sand;
+
 	// Initialize SDL video subsystem
 	if (SDL_Init(SDL_INIT_VIDEO) == 0)
 	{
@@ -14,15 +59,23 @@ int main(int argc, char *argv[])
 
 	// Create a window
 	SDL_Window* window = SDL_CreateWindow("C++ Physics Simulator", 800, 600, SDL_WINDOW_RESIZABLE);
-	SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
-	
-	if (!window || !renderer)
+
+	if (!window)
 	{
-		std::cerr << "Window/Renderer creation error: " << SDL_GetError() << std::endl;
+		std::cerr << "Window creation error: " << SDL_GetError() << std::endl;
 		SDL_Quit();
 		return -1;
 	}
 
+	SDL_Renderer* renderer = SDL_CreateRenderer(window, NULL);
+	
+	if (!renderer)
+	{
+		std::cerr << "Renderer creation error: " << SDL_GetError() << std::endl;
+		SDL_Quit();
+		return -1;
+	}
+	
 	// Main event loop
 	bool running = true;
 	SDL_Event event;
@@ -40,12 +93,14 @@ int main(int argc, char *argv[])
 		SDL_RenderClear(renderer);
 
 		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-		SDL_RenderPoint(renderer, 320.0f, 240.0f);
+
+		renderGrid(renderer, grid);
 
 		SDL_RenderPresent(renderer);
 	}
 
 	// Cleanup
+	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 	return 0;
