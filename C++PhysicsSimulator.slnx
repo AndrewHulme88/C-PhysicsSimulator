@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="C++PhysicsSimulator.vcxproj" />
+  <Project Path="C++PhysicsSimulator.vcxproj" Id="a40bb3d0-b4a1-4721-b707-5dfe0e981a17" />
 </Solution>
