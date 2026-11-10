@@ -16,11 +16,6 @@ enum class Material
 	Sand
 };
 
-struct MousePoint {
-	float mouseX;
-	float mouseY;
-};
-
 void renderGrid(SDL_Renderer* renderer, const std::vector<Material>& grid)
 {
 	for (int y = 0; y < GRID_HEIGHT; y++)
@@ -45,6 +40,20 @@ void renderGrid(SDL_Renderer* renderer, const std::vector<Material>& grid)
 			}
 		}
 	}
+}
+
+void placeSand(std::vector<Material>& grid, float mouseX, float mouseY)
+{
+	int x = static_cast<int>(mouseX) / CELL_SIZE;
+	int y = static_cast<int>(mouseY) / CELL_SIZE;
+
+	if (x < 0 || x >= GRID_WIDTH || y < 0 || y >= GRID_HEIGHT)
+	{
+		return;
+	}
+
+	int index = y * GRID_WIDTH + x;
+	grid[index] = Material::Sand;
 }
 
 int main(int argc, char *argv[])
@@ -81,11 +90,8 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	
-	// Store mouse points to draw
-	std::vector<MousePoint> mousePoints;
-	bool isDrawing = false;
-
 	// Main event loop
+	bool isDrawing = false;
 	bool running = true;
 	SDL_Event event;
 	
@@ -98,24 +104,27 @@ int main(int argc, char *argv[])
 			case SDL_EVENT_QUIT:
 				running = false;
 				break;
+
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:
 				if (event.button.button == SDL_BUTTON_LEFT)
 				{
 					isDrawing = true;
-					mousePoints.push_back({ event.button.x, event.button.y });
+					placeSand(grid, event.button.x, event.button.y);
 				}
 				break;
+
 			case SDL_EVENT_MOUSE_BUTTON_UP:
 				if (event.button.button == SDL_BUTTON_LEFT)
 				{
 					isDrawing = false;
 				}
 				break;
+
 			case SDL_EVENT_MOUSE_MOTION:
 				// If the left mouse button is held down, record the path
 				if (isDrawing)
 				{
-					mousePoints.push_back({ event.motion.x, event.motion.y });
+					placeSand(grid, event.motion.x, event.motion.y);
 				}
 				break;
 			}
@@ -127,22 +136,7 @@ int main(int argc, char *argv[])
 		SDL_RenderClear(renderer);
 
 		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-
-		if (mousePoints.size() > 1)
-		{
-			for (size_t i = 1; i < mousePoints.size(); ++i)
-			{
-				SDL_RenderLine(renderer, mousePoints[i - 1].mouseX, mousePoints[i - 1].mouseY,
-					mousePoints[i].mouseX, mousePoints[i].mouseY);
-			}
-		}
-		else if (mousePoints.size() == 1)
-		{
-			SDL_RenderPoint(renderer, mousePoints[0].mouseX, mousePoints[0].mouseY);
-		}
-
 		renderGrid(renderer, grid);
-
 		SDL_RenderPresent(renderer);
 	}
 
