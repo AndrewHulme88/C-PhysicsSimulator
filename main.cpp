@@ -56,6 +56,45 @@ void placeSand(std::vector<Material>& grid, float mouseX, float mouseY)
 	grid[index] = Material::Sand;
 }
 
+void updateSand(std::vector<Material>& grid)
+{
+	// Loop from the second to last row up to the top row
+	for (int y = GRID_HEIGHT - 2; y >= 0; --y)
+	{
+		for (int x = 0; x < GRID_WIDTH; ++x)
+		{
+			int index = y * GRID_WIDTH + x;
+
+			// Only apply gravity to sand
+			if (grid[index] == Material::Sand)
+			{
+				int below = (y + 1) * GRID_WIDTH + x;
+				int belowLeft = (y + 1) * GRID_WIDTH + (x - 1);
+				int belowRight = (y + 1) * GRID_WIDTH + (x + 1);
+
+				// Fall straight down if empty
+				if (grid[below] == Material::Empty)
+				{
+					grid[below] = Material::Sand;
+					grid[index] = Material::Empty;
+				}
+				// Slide down-left 
+				else if (x > 0 && grid[belowLeft] == Material::Empty)
+				{
+					grid[belowLeft] = Material::Sand;
+					grid[index] = Material::Empty;
+				}
+				// Slide down-right
+				else if (x < GRID_WIDTH - 1 && grid[belowRight] == Material::Empty)
+				{
+					grid[belowRight] = Material::Sand;
+					grid[index] = Material::Empty;
+				}
+			}
+		}
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	std::vector<Material> grid(GRID_WIDTH * GRID_HEIGHT, Material::Empty);
@@ -128,9 +167,12 @@ int main(int argc, char *argv[])
 				}
 				break;
 			}
-				
 		}
+
 		SDL_Delay(16); // 60 FPS cap
+
+		// Update physics
+		updateSand(grid);
 
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 		SDL_RenderClear(renderer);
