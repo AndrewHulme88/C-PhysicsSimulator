@@ -2,19 +2,16 @@
 #include <SDL3/SDL_main.h>
 #include <iostream>
 #include <vector>
-#include <random>
+#include "Material.h"
+#include "World.h"
 
-constexpr int WINDOW_WIDTH = 800;
-constexpr int WINDOW_HEIGHT = 600;
+// Grid size lives in World.h so main.cpp and World.cpp always agree
+constexpr int GRID_WIDTH = World::GRID_WIDTH;
+constexpr int GRID_HEIGHT = World::GRID_HEIGHT;
 constexpr int CELL_SIZE = 4;
-constexpr int GRID_WIDTH = WINDOW_WIDTH / CELL_SIZE;
-constexpr int GRID_HEIGHT = WINDOW_HEIGHT / CELL_SIZE;
-
-enum class Material
-{
-	Empty,
-	Sand
-};
+constexpr int WINDOW_WIDTH = GRID_WIDTH * CELL_SIZE;
+constexpr int WINDOW_HEIGHT = GRID_HEIGHT * CELL_SIZE;
+constexpr double FIXED_TIMESTAMP = 1.0 / 60.0;
 
 void renderGrid(SDL_Renderer* renderer, const std::vector<Material>& grid)
 {
@@ -42,81 +39,22 @@ void renderGrid(SDL_Renderer* renderer, const std::vector<Material>& grid)
 	}
 }
 
-void placeSand(std::vector<Material>& grid, float mouseX, float mouseY)
+// Convert a mouse position (pixels) to a grid cell and place sand there
+void placeSand(World& world, float mouseX, float mouseY)
 {
 	int x = static_cast<int>(mouseX) / CELL_SIZE;
 	int y = static_cast<int>(mouseY) / CELL_SIZE;
 
-	if (x < 0 || x >= GRID_WIDTH || y < 0 || y >= GRID_HEIGHT)
-	{
-		return;
-	}
-
-	int index = y * GRID_WIDTH + x;
-	grid[index] = Material::Sand;
-}
-
-void updateSand(std::vector<Material>& grid)
-{
-	// Static random generator so it isn't re-seaded every frame
-	static std::mt19937 rng(std::random_device{}());
-	std::uniform_int_distribution<int> coinFlip(0, 1);
-
-	// Loop from the second to last row up to the top row
-	for (int y = GRID_HEIGHT - 2; y >= 0; --y)
-	{
-		// Randomize horizontal scan order to prevent sand moving right to be updated twice in one frame
-		bool scanLeftToRight = coinFlip(rng) == 0;
-
-		for (int i = 0; i < GRID_WIDTH; ++i)
-		{
-			int x = scanLeftToRight ? i : (GRID_WIDTH - 1 - i);
-			int index = y * GRID_WIDTH + x;
-
-			// Only apply gravity to sand
-			if (grid[index] == Material::Sand)
-			{
-				int below = (y + 1) * GRID_WIDTH + x;
-
-				// Fall straight down if empty
-				if (grid[below] == Material::Empty)
-				{
-					grid[below] = Material::Sand;
-					grid[index] = Material::Empty;
-				}
-				// Otherwise check diagonals in random order 
-				else
-				{
-					bool checkLeftFirst = coinFlip(rng) == 0;
-
-					int firstX = checkLeftFirst ? (x - 1) : (x + 1);
-					int secondX = checkLeftFirst ? (x + 1) : (x - 1);
-
-					// Helper check for the first chosen diagonal
-					if (firstX >= 0 && firstX < GRID_WIDTH && grid[(y + 1) * GRID_WIDTH + firstX] == Material::Empty)
-					{
-						grid[(y + 1) * GRID_WIDTH + firstX] = Material::Sand;
-						grid[index] = Material::Empty;
-					}
-					// Fallback check for the opposite diagonal
-					else if (secondX >= 0 && secondX < GRID_WIDTH && grid[(y + 1) * GRID_WIDTH + secondX] == Material::Empty)
-					{
-						grid[(y + 1) * GRID_WIDTH + secondX] = Material::Sand;
-						grid[index] = Material::Empty;
-					}
-				}
-			}
-		}
-	}
+	world.placeMaterial(x, y, Material::Sand); // World does the bounds check
 }
 
 int main(int argc, char *argv[])
 {
-	std::vector<Material> grid(GRID_WIDTH * GRID_HEIGHT, Material::Empty);
+	World world;
 
-	grid[30 * GRID_WIDTH + 50] = Material::Sand;
-	grid[50 * GRID_WIDTH + 60] = Material::Sand;
-	grid[55 * GRID_WIDTH + 60] = Material::Sand;
+	world.placeMaterial(50, 30, Material::Sand);
+	world.placeMaterial(60, 50, Material::Sand);
+	world.placeMaterial(60, 55, Material::Sand);
 
 	// Initialize SDL video subsystem
 	if (SDL_Init(SDL_INIT_VIDEO) == 0)
@@ -126,7 +64,7 @@ int main(int argc, char *argv[])
 	}
 
 	// Create a window
-	SDL_Window* window = SDL_CreateWindow("C++ Physics Simulator", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
+	SDL_Window* window = SDL_CreateWindow("C++ Physics Simulator", WINDOW_WIDTH, WINDOW_HEIGHT, NULL);
 
 	if (!window)
 	{
@@ -140,6 +78,7 @@ int main(int argc, char *argv[])
 	if (!renderer)
 	{
 		std::cerr << "Renderer creation error: " << SDL_GetError() << std::endl;
+		SDL_DestroyWindow(window);
 		SDL_Quit();
 		return -1;
 	}
@@ -163,7 +102,7 @@ int main(int argc, char *argv[])
 				if (event.button.button == SDL_BUTTON_LEFT)
 				{
 					isDrawing = true;
-					placeSand(grid, event.button.x, event.button.y);
+					placeSand(world, event.button.x, event.button.y);
 				}
 				break;
 
@@ -178,22 +117,22 @@ int main(int argc, char *argv[])
 				// If the left mouse button is held down, record the path
 				if (isDrawing)
 				{
-					placeSand(grid, event.motion.x, event.motion.y);
+					placeSand(world, event.motion.x, event.motion.y);
 				}
 				break;
 			}
 		}
 
-		SDL_Delay(16); // 60 FPS cap
+		SDL_Delay(static_cast<Uint32>(FIXED_TIMESTAMP * 1000)); // ~60 FPS cap (SDL_Delay takes milliseconds)
 
 		// Update physics
-		updateSand(grid);
+		world.update();
 
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 		SDL_RenderClear(renderer);
 
 		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-		renderGrid(renderer, grid);
+		renderGrid(renderer, world.getCells());
 		SDL_RenderPresent(renderer);
 	}
 
