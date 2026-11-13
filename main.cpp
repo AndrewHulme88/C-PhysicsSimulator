@@ -1,8 +1,8 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <iostream>
-#include <string>
 #include <vector>
+#include <random>
 
 constexpr int WINDOW_WIDTH = 800;
 constexpr int WINDOW_HEIGHT = 600;
@@ -58,19 +58,25 @@ void placeSand(std::vector<Material>& grid, float mouseX, float mouseY)
 
 void updateSand(std::vector<Material>& grid)
 {
+	// Static random generator so it isn't re-seaded every frame
+	static std::mt19937 rng(std::random_device{}());
+	std::uniform_int_distribution<int> coinFlip(0, 1);
+
 	// Loop from the second to last row up to the top row
 	for (int y = GRID_HEIGHT - 2; y >= 0; --y)
 	{
-		for (int x = 0; x < GRID_WIDTH; ++x)
+		// Randomize horizontal scan order to prevent sand moving right to be updated twice in one frame
+		bool scanLeftToRight = coinFlip(rng) == 0;
+
+		for (int i = 0; i < GRID_WIDTH; ++i)
 		{
+			int x = scanLeftToRight ? i : (GRID_WIDTH - 1 - i);
 			int index = y * GRID_WIDTH + x;
 
 			// Only apply gravity to sand
 			if (grid[index] == Material::Sand)
 			{
 				int below = (y + 1) * GRID_WIDTH + x;
-				int belowLeft = (y + 1) * GRID_WIDTH + (x - 1);
-				int belowRight = (y + 1) * GRID_WIDTH + (x + 1);
 
 				// Fall straight down if empty
 				if (grid[below] == Material::Empty)
@@ -78,17 +84,26 @@ void updateSand(std::vector<Material>& grid)
 					grid[below] = Material::Sand;
 					grid[index] = Material::Empty;
 				}
-				// Slide down-left 
-				else if (x > 0 && grid[belowLeft] == Material::Empty)
+				// Otherwise check diagonals in random order 
+				else
 				{
-					grid[belowLeft] = Material::Sand;
-					grid[index] = Material::Empty;
-				}
-				// Slide down-right
-				else if (x < GRID_WIDTH - 1 && grid[belowRight] == Material::Empty)
-				{
-					grid[belowRight] = Material::Sand;
-					grid[index] = Material::Empty;
+					bool checkLeftFirst = coinFlip(rng) == 0;
+
+					int firstX = checkLeftFirst ? (x - 1) : (x + 1);
+					int secondX = checkLeftFirst ? (x + 1) : (x - 1);
+
+					// Helper check for the first chosen diagonal
+					if (firstX >= 0 && firstX < GRID_WIDTH && grid[(y + 1) * GRID_WIDTH + firstX] == Material::Empty)
+					{
+						grid[(y + 1) * GRID_WIDTH + firstX] = Material::Sand;
+						grid[index] = Material::Empty;
+					}
+					// Fallback check for the opposite diagonal
+					else if (secondX >= 0 && secondX < GRID_WIDTH && grid[(y + 1) * GRID_WIDTH + secondX] == Material::Empty)
+					{
+						grid[(y + 1) * GRID_WIDTH + secondX] = Material::Sand;
+						grid[index] = Material::Empty;
+					}
 				}
 			}
 		}
