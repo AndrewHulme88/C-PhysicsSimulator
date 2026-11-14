@@ -1,11 +1,10 @@
 #include "World.h"
 #include <random>
+#include <algorithm>
+#include <cmath>
 
 void World::update()
 {
-	// Created fresh each update: no cells have moved yet
-	std::vector<bool> updated(cells.size(), false);
-
 	// Static random generator so it isn't re-seaded every frame
 	static std::mt19937 rng(std::random_device{}());
 	std::uniform_int_distribution<int> coinFlip(0, 1);
@@ -19,11 +18,6 @@ void World::update()
 		{
 			int x = scanLeftToRight ? i : (GRID_WIDTH - 1 - i);
 			int index = y * GRID_WIDTH + x;
-
-			if (updated[index])
-			{
-				continue;
-			}
 
 			// Sand
 			// Only apply gravity to sand, skip the bottom row
@@ -59,47 +53,111 @@ void World::update()
 					}
 				}
 			}
-			// Water
-			else if (cells[index] == Material::Water)
+		}
+	}
+
+	updateWater();
+}
+
+void World::updateWater()
+{
+	constexpr float compression = 0.02f;
+	constexpr float minTransfer = 0.00001f;
+
+	const auto& current = waterMass;
+	auto next = current;
+
+	auto isOpen = [&](int index)
+	{
+		return cells[index] == Material::Empty || cells[index] == Material::Water;
+	};
+
+	// Given the combined water in two vertically adjacent cells
+	// calculate how much should settle in the lower cell
+	auto stableBottom = [=](float total) -> float
+	{
+		if (total <= 1.0f)
+		{
+			return total;
+		}
+
+		if (total < 2.0f + compression)
+		{
+			return (1.0f + compression * total) / (1.0f + compression);
+		}
+
+		return (total + compression) / 2.0f;
+	};
+
+	// Positive flow: a -> b. Negative flow: b -> a
+	auto exchange = [&](int a, int b, float flow)
+	{
+		int from = flow > 0.0f ? a : b;
+		int to = flow > 0.0f ? b : a;
+
+		// A cell has four neighbours. Limiting each outgoing transfer
+		// to 1/4 of its starting amount prevents it sending too much
+		float amount = std::min(std::abs(flow), current[from] * 0.25f);
+
+		if (amount < minTransfer)
+		{
+			return;
+		}
+
+		next[from] -= amount;
+		next[to] += amount;
+	};
+
+	for (int y = 0; y < GRID_HEIGHT; ++y)
+	{
+		for (int x = 0; x < GRID_WIDTH; ++x)
+		{
+			int index = y * GRID_WIDTH + x;
+
+			if (!isOpen(index))
 			{
-				// Try moving this water cell to a neighbouring position
-				// Return true if the move succeeded
-				auto tryMove = [&](int targetX, int targetY) -> bool
+				continue;
+			}
+
+			// Process each horizontal pair once
+			if (x + 1 < GRID_WIDTH)
+			{
+				int right = index + 1;
+
+				if (isOpen(right))
 				{
-					if (targetX < 0 || targetX >= GRID_WIDTH ||
-						targetY < 0 || targetY >= GRID_HEIGHT)
-					{
-						return false;
-					}
+					float flow = (current[index] - current[right]) * 0.25f;
 
-					int target = targetY * GRID_WIDTH + targetX;
-
-					if (cells[target] != Material::Empty)
-					{
-						return false;
-					}
-
-					cells[target] = Material::Water;
-					cells[index] = Material::Empty;
-
-					// Don't process the moved water again this update
-					updated[target] = true;
-					return true;
-				};
-
-				int direction = coinFlip(rng) == 0 ? -1 : 1;
-
-				if (
-					tryMove(x, y + 1) ||				// Down
-					tryMove(x + direction, y + 1) ||	// First diagonal
-					tryMove(x - direction, y + 1) ||	// Other diagonal
-					tryMove(x + direction, y) ||		// First side
-					tryMove(x - direction, y)			// Other side
-					)
-				{
-					continue;
+					exchange(index, right, flow);
 				}
 			}
+
+			// Process each vertical pair once
+			if (y + 1 < GRID_HEIGHT)
+			{
+				int below = index + GRID_WIDTH;
+
+				if (isOpen(below))
+				{
+					float total = current[index] + current[below];
+					float desiredBelow = stableBottom(total);
+
+					float flow = (desiredBelow - current[below]) * 0.5f;
+
+					exchange(index, below, flow);
+				}
+			}
+		}
+	}
+
+	waterMass.swap(next);
+
+	// Keep material labels consistent with the new amounts
+	for (int index = 0; index < GRID_WIDTH * GRID_HEIGHT; ++index)
+	{
+		if (isOpen(index))
+		{
+			cells[index] = waterMass[index] > 0.0f ? Material::Water : Material::Empty;
 		}
 	}
 }
@@ -111,7 +169,27 @@ void World::placeMaterial(int x, int y, Material material)
 		return;
 	}
 
-	cells[y * GRID_WIDTH + x] = material;
+	int index = y * GRID_WIDTH + x;
+
+	if (material == Material::Water)
+	{
+		// Water can't be pointed inside a solid
+		// ------------ Will need to be changed if more solid materials are added ------------
+		if (cells[index] == Material::Sand || cells[index] == Material::Stone)
+		{
+			return;
+		}
+
+		// Fill the cell without removing existing compressed water
+		waterMass[index] = std::max(waterMass[index], 1.0f);
+	}
+	else
+	{
+		// Replacing water with another material removes its water
+		waterMass[index] = 0.0f;
+	}
+
+	cells[index] = material;
 }
 
 const std::vector<Material>& World::getCells() const

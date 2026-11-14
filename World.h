@@ -18,6 +18,15 @@ public:
 	// Read-only access to the grid (e.g. for rendering)
 	const std::vector<Material>& getCells() const;
 
+	const std::vector<float>& getWaterMass() const
+	{
+		return waterMass;
+	}
+
 private:
 	std::vector<Material> cells = std::vector<Material>(GRID_WIDTH * GRID_HEIGHT, Material::Empty);
+
+	std::vector<float> waterMass = std::vector<float>(GRID_WIDTH * GRID_HEIGHT, 0.0f);
+
+	void updateWater();
 };
