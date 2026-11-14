@@ -63,9 +63,10 @@ void World::updateWater()
 {
 	constexpr float compression = 0.02f;
 	constexpr float minTransfer = 0.00001f;
+	constexpr int LEVELING_PASSES = 8;
 
-	const auto& current = waterMass;
-	auto next = current;
+	auto next = waterMass;
+	auto remaining = waterMass;
 
 	auto isOpen = [&](int index)
 	{
@@ -97,55 +98,75 @@ void World::updateWater()
 
 		// A cell has four neighbours. Limiting each outgoing transfer
 		// to 1/4 of its starting amount prevents it sending too much
-		float amount = std::min(std::abs(flow), current[from] * 0.25f);
+		float amount = std::min(std::abs(flow), remaining[from]);
 
 		if (amount < minTransfer)
 		{
 			return;
 		}
 
+		remaining[from] -= amount;
 		next[from] -= amount;
 		next[to] += amount;
 	};
 
-	for (int y = 0; y < GRID_HEIGHT; ++y)
+	// First: vertical flow, working up from bottom
+	// Lower cells make room before above try to fall
+	for (int y = GRID_HEIGHT - 2; y >=0; --y)
 	{
 		for (int x = 0; x < GRID_WIDTH; ++x)
 		{
-			int index = y * GRID_WIDTH + x;
+			int above = y * GRID_WIDTH + x;
+			int below = above + GRID_WIDTH;
 
-			if (!isOpen(index))
+			if (!isOpen(above) || !isOpen(below))
 			{
 				continue;
 			}
 
-			// Process each horizontal pair once
-			if (x + 1 < GRID_WIDTH)
+			float total = next[above] + next[below];
+			float desiredBelow = stableBottom(total);
+			float flow = desiredBelow - next[below];
+
+			exchange(above, below, flow);
+		}
+	}
+
+	// Second: sideways flow, using amounts after vertical flow
+	for (int pass = 0; pass < LEVELING_PASSES; ++pass)
+	{
+		// Each pass works from the previous pass's result
+		const auto sideways = next;
+		remaining = sideways;
+
+		for (int y = 0; y < GRID_HEIGHT; ++y)
+		{
+			for (int x = 0; x < GRID_WIDTH - 1; ++x)
 			{
-				int right = index + 1;
+				int left = y * GRID_WIDTH + x;
+				int right = left + 1;
 
-				if (isOpen(right))
+				if (!isOpen(left) || !isOpen(right))
 				{
-					float flow = (current[index] - current[right]) * 0.25f;
-
-					exchange(index, right, flow);
+					continue;
 				}
-			}
 
-			// Process each vertical pair once
-			if (y + 1 < GRID_HEIGHT)
-			{
-				int below = index + GRID_WIDTH;
+				float flow = (sideways[left] - sideways[right]) * 0.25f;
+				int from = flow > 0.0f ? left : right;
+				int below = from + GRID_WIDTH;
 
-				if (isOpen(below))
+				// Only supported water spreads sideways
+				// This keeps falling drops from dispersing in midair
+				bool supported = from / GRID_WIDTH == GRID_HEIGHT - 1 ||
+					!isOpen(below) ||
+					sideways[below] >= 1.0f - minTransfer;
+
+				if (!supported)
 				{
-					float total = current[index] + current[below];
-					float desiredBelow = stableBottom(total);
-
-					float flow = (desiredBelow - current[below]) * 0.5f;
-
-					exchange(index, below, flow);
+					continue;
 				}
+
+				exchange(left, right, flow);
 			}
 		}
 	}
