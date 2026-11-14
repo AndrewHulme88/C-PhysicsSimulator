@@ -33,6 +33,10 @@ void renderGrid(SDL_Renderer* renderer, const std::vector<Material>& grid)
 			case Material::Stone:
 				SDL_SetRenderDrawColor(renderer, 120, 120, 120, 225);
 				break;
+
+			case Material::Water:
+				SDL_SetRenderDrawColor(renderer, 50, 130, 230, 255);
+				break;
 			}
 
 			SDL_FRect rect{
@@ -53,7 +57,7 @@ void placeSand(World& world, float mouseX, float mouseY)
 	int x = static_cast<int>(mouseX) / CELL_SIZE;
 	int y = static_cast<int>(mouseY) / CELL_SIZE;
 
-	world.placeMaterial(x, y, Material::Sand); // World does the bounds check
+	world.placeMaterial(x, y, Material::Water); // World does the bounds check
 }
 
 int main(int argc, char *argv[])

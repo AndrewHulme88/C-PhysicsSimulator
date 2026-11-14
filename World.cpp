@@ -3,12 +3,14 @@
 
 void World::update()
 {
+	// Created fresh each update: no cells have moved yet
+	std::vector<bool> updated(cells.size(), false);
+
 	// Static random generator so it isn't re-seaded every frame
 	static std::mt19937 rng(std::random_device{}());
 	std::uniform_int_distribution<int> coinFlip(0, 1);
 
-	// Loop from the second to last row up to the top row
-	for (int y = GRID_HEIGHT - 2; y >= 0; --y)
+	for (int y = GRID_HEIGHT - 1; y >= 0; --y)
 	{
 		// Randomize horizontal scan order to prevent sand moving right to be updated twice in one frame
 		bool scanLeftToRight = coinFlip(rng) == 0;
@@ -18,8 +20,14 @@ void World::update()
 			int x = scanLeftToRight ? i : (GRID_WIDTH - 1 - i);
 			int index = y * GRID_WIDTH + x;
 
-			// Only apply gravity to sand
-			if (cells[index] == Material::Sand)
+			if (updated[index])
+			{
+				continue;
+			}
+
+			// Sand
+			// Only apply gravity to sand, skip the bottom row
+			if (cells[index] == Material::Sand && y + 1 < GRID_HEIGHT)
 			{
 				int below = (y + 1) * GRID_WIDTH + x;
 
@@ -49,6 +57,47 @@ void World::update()
 						cells[(y + 1) * GRID_WIDTH + secondX] = Material::Sand;
 						cells[index] = Material::Empty;
 					}
+				}
+			}
+			// Water
+			else if (cells[index] == Material::Water)
+			{
+				// Try moving this water cell to a neighbouring position
+				// Return true if the move succeeded
+				auto tryMove = [&](int targetX, int targetY) -> bool
+				{
+					if (targetX < 0 || targetX >= GRID_WIDTH ||
+						targetY < 0 || targetY >= GRID_HEIGHT)
+					{
+						return false;
+					}
+
+					int target = targetY * GRID_WIDTH + targetX;
+
+					if (cells[target] != Material::Empty)
+					{
+						return false;
+					}
+
+					cells[target] = Material::Water;
+					cells[index] = Material::Empty;
+
+					// Don't process the moved water again this update
+					updated[target] = true;
+					return true;
+				};
+
+				int direction = coinFlip(rng) == 0 ? -1 : 1;
+
+				if (
+					tryMove(x, y + 1) ||				// Down
+					tryMove(x + direction, y + 1) ||	// First diagonal
+					tryMove(x - direction, y + 1) ||	// Other diagonal
+					tryMove(x + direction, y) ||		// First side
+					tryMove(x - direction, y)			// Other side
+					)
+				{
+					continue;
 				}
 			}
 		}
