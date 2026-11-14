@@ -21,20 +21,28 @@ void renderGrid(SDL_Renderer* renderer, const std::vector<Material>& grid)
 		{
 			int index = y * GRID_WIDTH + x;
 
-			if (grid[index] == Material::Sand)
+			switch (grid[index])
 			{
-				float screenX = static_cast<float>(x * CELL_SIZE);
-				float screenY = static_cast<float>(y * CELL_SIZE);
+			case Material::Empty:
+				continue;
 
-				SDL_FRect rect{
-					screenX,
-					screenY,
-					static_cast<float>(CELL_SIZE),
-					static_cast<float>(CELL_SIZE)
-				};
+			case Material::Sand:
+				SDL_SetRenderDrawColor(renderer, 230, 190, 80, 255);
+				break;
 
-				SDL_RenderFillRect(renderer, &rect);
+			case Material::Stone:
+				SDL_SetRenderDrawColor(renderer, 120, 120, 120, 225);
+				break;
 			}
+
+			SDL_FRect rect{
+				static_cast<float>(x * CELL_SIZE),
+				static_cast<float>(y * CELL_SIZE),
+				static_cast<float>(CELL_SIZE),
+				static_cast<float>(CELL_SIZE)
+			};
+
+			SDL_RenderFillRect(renderer, &rect);
 		}
 	}
 }
@@ -51,6 +59,11 @@ void placeSand(World& world, float mouseX, float mouseY)
 int main(int argc, char *argv[])
 {
 	World world;
+
+	for (int x = 40; x <= 70; ++x)
+	{
+		world.placeMaterial(x, 80, Material::Stone);
+	}
 
 	world.placeMaterial(50, 30, Material::Sand);
 	world.placeMaterial(60, 50, Material::Sand);

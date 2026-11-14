@@ -3,5 +3,6 @@
 enum class Material
 {
 	Empty,
-	Sand
+	Sand,
+	Stone
 };
