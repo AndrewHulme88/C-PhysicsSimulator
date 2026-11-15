@@ -10,9 +10,24 @@
 constexpr int GRID_WIDTH = World::GRID_WIDTH;
 constexpr int GRID_HEIGHT = World::GRID_HEIGHT;
 constexpr int CELL_SIZE = 4;
+constexpr int TOOLBAR_HEIGHT = 48;
 constexpr int WINDOW_WIDTH = GRID_WIDTH * CELL_SIZE;
-constexpr int WINDOW_HEIGHT = GRID_HEIGHT * CELL_SIZE;
+constexpr int WINDOW_HEIGHT = GRID_HEIGHT * CELL_SIZE + TOOLBAR_HEIGHT;
 constexpr double FIXED_TIMESTAMP = 1.0 / 60.0;
+
+struct MaterialButton
+{
+	Material material;
+	const char* label;
+	SDL_FRect bounds;
+};
+
+const MaterialButton materialButtons[] = {
+	{ Material::Empty, "Eraser",{ 8.0f, 8.0f, 100.0f, 32.0f } },
+	{ Material::Sand, "Sand",{ 116.0f, 8.0f, 100.0f, 32.0f } },
+	{ Material::Stone, "Stone",{ 224.0f, 8.0f, 100.0f, 32.0f } },
+	{ Material::Water, "Water",{ 322.0f, 8.0f, 100.0f, 32.0f } }
+};
 
 void renderGrid(SDL_Renderer* renderer, 
 	const std::vector<Material>& grid, 
@@ -44,7 +59,7 @@ void renderGrid(SDL_Renderer* renderer,
 
 			SDL_FRect rect{
 				static_cast<float>(x * CELL_SIZE),
-				static_cast<float>(y * CELL_SIZE),
+				static_cast<float>(y * CELL_SIZE + TOOLBAR_HEIGHT),
 				static_cast<float>(CELL_SIZE),
 				static_cast<float>(CELL_SIZE)
 			};
@@ -63,12 +78,61 @@ void renderGrid(SDL_Renderer* renderer,
 }
 
 // Convert a mouse position (pixels) to a grid cell and place sand there
-void placeSand(World& world, float mouseX, float mouseY)
+void paintMaterial(World& world, float mouseX, float mouseY, Material material)
 {
-	int x = static_cast<int>(mouseX) / CELL_SIZE;
-	int y = static_cast<int>(mouseY) / CELL_SIZE;
+	// Ignore the toolbar and positions outside the drawing area
+	if (mouseX < 0 || mouseX >= WINDOW_WIDTH ||
+		mouseY < TOOLBAR_HEIGHT || mouseY >= WINDOW_HEIGHT)
+	{
+		return;
+	}
 
-	world.placeMaterial(x, y, Material::Water); // World does the bounds check
+	int x = static_cast<int>(mouseX) / CELL_SIZE;
+	int y = static_cast<int>(mouseY - TOOLBAR_HEIGHT) / CELL_SIZE;
+
+	world.placeMaterial(x, y, material);
+}
+
+void renderToolbar(SDL_Renderer* renderer, Material selectedMaterial)
+{
+	SDL_FRect background{
+		0.0f,
+		0.0f,
+		static_cast<float>(WINDOW_WIDTH),
+		static_cast<float>(TOOLBAR_HEIGHT)
+	};
+
+	SDL_SetRenderDrawColor(renderer, 25, 25, 30, 255);
+	SDL_RenderFillRect(renderer, &background);
+
+	for (const auto& button : materialButtons)
+	{
+		bool selected = button.material == selectedMaterial;
+
+		if (selected)
+		{
+			SDL_SetRenderDrawColor(renderer, 50, 90, 150, 255);
+		}
+		else
+		{
+			SDL_SetRenderDrawColor(renderer, 55, 55, 65, 255);
+		}
+
+		SDL_RenderFillRect(renderer, &button.bounds);
+		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+
+		if (selected)
+		{
+			SDL_RenderRect(renderer, &button.bounds);
+		}
+
+		SDL_RenderDebugText(
+			renderer,
+			button.bounds.x + 12.0f,
+			button.bounds.y + 12.0f,
+			button.label
+		);
+	}
 }
 
 int main(int argc, char *argv[])
@@ -112,6 +176,7 @@ int main(int argc, char *argv[])
 	}
 	
 	// Main event loop
+	Material selectedMaterial = Material::Sand;
 	bool isDrawing = false;
 	bool running = true;
 	SDL_Event event;
@@ -129,8 +194,35 @@ int main(int argc, char *argv[])
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:
 				if (event.button.button == SDL_BUTTON_LEFT)
 				{
-					isDrawing = true;
-					placeSand(world, event.button.x, event.button.y);
+					isDrawing = false;
+					
+					if (event.button.y < TOOLBAR_HEIGHT)
+					{
+						SDL_FPoint mouse{
+							event.button.x,
+							event.button.y
+						};
+
+						for (const auto& button : materialButtons)
+						{
+							if (SDL_PointInRectFloat(&mouse, &button.bounds))
+							{
+								selectedMaterial = button.material;
+								break;
+							}
+						}
+					}
+					else
+					{
+						isDrawing = true;
+
+						paintMaterial(
+							world,
+							event.button.x,
+							event.button.y,
+							selectedMaterial
+						);
+					}
 				}
 				break;
 
@@ -145,7 +237,11 @@ int main(int argc, char *argv[])
 				// If the left mouse button is held down, record the path
 				if (isDrawing)
 				{
-					placeSand(world, event.motion.x, event.motion.y);
+					paintMaterial(
+						world, 
+						event.motion.x, 
+						event.motion.y, 
+						selectedMaterial);
 				}
 				break;
 			}
@@ -161,6 +257,7 @@ int main(int argc, char *argv[])
 
 		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
 		renderGrid(renderer, world.getCells(), world.getWaterMass());
+		renderToolbar(renderer, selectedMaterial);
 		SDL_RenderPresent(renderer);
 	}
 

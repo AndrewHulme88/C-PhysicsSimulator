@@ -63,7 +63,7 @@ void World::updateWater()
 {
 	constexpr float compression = 0.02f;
 	constexpr float minTransfer = 0.00001f;
-	constexpr int LEVELING_PASSES = 8;
+	constexpr int LEVELING_PASSES = 12;
 
 	auto next = waterMass;
 	auto remaining = waterMass;
