@@ -2,6 +2,7 @@
 #include <random>
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 void World::update()
 {
@@ -23,34 +24,41 @@ void World::update()
 			// Only apply gravity to sand, skip the bottom row
 			if (cells[index] == Material::Sand && y + 1 < GRID_HEIGHT)
 			{
-				int below = (y + 1) * GRID_WIDTH + x;
-
-				// Fall straight down if empty
-				if (cells[below] == Material::Empty)
+				auto tryMoveSand = [&](int targetX) -> bool
 				{
-					cells[below] = Material::Sand;
-					cells[index] = Material::Empty;
+					if (targetX < 0 || targetX >= GRID_WIDTH)
+					{
+						return false;
+					}
+
+					int target = (y + 1) * GRID_WIDTH + targetX;
+
+					if (cells[target] != Material::Empty &&
+						cells[target] != Material::Water)
+					{
+						return false;
+					}
+
+					// Move sand into the destination and bring whatever was
+					// there including its water amount into the old sand cell
+					std::swap(cells[index], cells[target]);
+					std::swap(waterMass[index], waterMass[target]);
+
+					return true;
+				};
+
+				// Prefer falling straight down, including through water
+				if (tryMoveSand(x))
+				{
+					continue;
 				}
-				// Otherwise check diagonals in random order 
-				else
+
+				// Otherwise try diagonals in random order
+				int direction = coinFlip(rng) == 0 ? -1 : 1;
+
+				if (!tryMoveSand(x + direction))
 				{
-					bool checkLeftFirst = coinFlip(rng) == 0;
-
-					int firstX = checkLeftFirst ? (x - 1) : (x + 1);
-					int secondX = checkLeftFirst ? (x + 1) : (x - 1);
-
-					// Helper check for the first chosen diagonal
-					if (firstX >= 0 && firstX < GRID_WIDTH && cells[(y + 1) * GRID_WIDTH + firstX] == Material::Empty)
-					{
-						cells[(y + 1) * GRID_WIDTH + firstX] = Material::Sand;
-						cells[index] = Material::Empty;
-					}
-					// Fallback check for the opposite diagonal
-					else if (secondX >= 0 && secondX < GRID_WIDTH && cells[(y + 1) * GRID_WIDTH + secondX] == Material::Empty)
-					{
-						cells[(y + 1) * GRID_WIDTH + secondX] = Material::Sand;
-						cells[index] = Material::Empty;
-					}
+					tryMoveSand(x - direction);
 				}
 			}
 		}
