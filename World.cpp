@@ -3,35 +3,59 @@
 #include <algorithm>
 #include <cmath>
 #include <utility>
+#include <stdexcept>
+
+World::World(int width, int height, std::uint32_t seed)
+	: width(width), height(height), rng(seed)
+{
+	if (width <= 0 || height <= 0)
+	{
+		throw std::invalid_argument("World dimensions must be positive");
+	}
+
+	const auto count = static_cast<std::size_t>(width) * height;
+
+	cells.resize(count, Material::Empty);
+	waterMass.resize(count, 0.0f);
+}
+
+bool World::inBounds(int x, int y) const
+{
+	return x >= 0 && x < width && y >= 0 && y < height;
+}
+
+std::size_t World::indexOf(int x, int y) const
+{
+	return static_cast<std::size_t>(y) * width + x;
+}
 
 void World::update()
 {
-	// Static random generator so it isn't re-seaded every frame
-	static std::mt19937 rng(std::random_device{}());
+	// Random generator so it isn't re-seaded every frame
 	std::uniform_int_distribution<int> coinFlip(0, 1);
 
-	for (int y = GRID_HEIGHT - 1; y >= 0; --y)
+	for (int y = height - 1; y >= 0; --y)
 	{
 		// Randomize horizontal scan order to prevent sand moving right to be updated twice in one frame
 		bool scanLeftToRight = coinFlip(rng) == 0;
 
-		for (int i = 0; i < GRID_WIDTH; ++i)
+		for (int i = 0; i < width; ++i)
 		{
-			int x = scanLeftToRight ? i : (GRID_WIDTH - 1 - i);
-			int index = y * GRID_WIDTH + x;
+			int x = scanLeftToRight ? i : (width - 1 - i);
+			int index = y * width + x;
 
 			// Sand
 			// Only apply gravity to sand, skip the bottom row
-			if (cells[index] == Material::Sand && y + 1 < GRID_HEIGHT)
+			if (cells[index] == Material::Sand && y + 1 < height)
 			{
 				auto tryMoveSand = [&](int targetX) -> bool
 				{
-					if (targetX < 0 || targetX >= GRID_WIDTH)
+					if (targetX < 0 || targetX >= width)
 					{
 						return false;
 					}
 
-					int target = (y + 1) * GRID_WIDTH + targetX;
+					int target = (y + 1) * width + targetX;
 
 					if (cells[target] != Material::Empty &&
 						cells[target] != Material::Water)
@@ -120,12 +144,12 @@ void World::updateWater()
 
 	// First: vertical flow, working up from bottom
 	// Lower cells make room before above try to fall
-	for (int y = GRID_HEIGHT - 2; y >=0; --y)
+	for (int y = height - 2; y >=0; --y)
 	{
-		for (int x = 0; x < GRID_WIDTH; ++x)
+		for (int x = 0; x < width; ++x)
 		{
-			int above = y * GRID_WIDTH + x;
-			int below = above + GRID_WIDTH;
+			int above = y * width + x;
+			int below = above + width;
 
 			if (!isOpen(above) || !isOpen(below))
 			{
@@ -147,11 +171,11 @@ void World::updateWater()
 		const auto sideways = next;
 		remaining = sideways;
 
-		for (int y = 0; y < GRID_HEIGHT; ++y)
+		for (int y = 0; y < height; ++y)
 		{
-			for (int x = 0; x < GRID_WIDTH - 1; ++x)
+			for (int x = 0; x < width - 1; ++x)
 			{
-				int left = y * GRID_WIDTH + x;
+				int left = y * width + x;
 				int right = left + 1;
 
 				if (!isOpen(left) || !isOpen(right))
@@ -161,11 +185,11 @@ void World::updateWater()
 
 				float flow = (sideways[left] - sideways[right]) * 0.25f;
 				int from = flow > 0.0f ? left : right;
-				int below = from + GRID_WIDTH;
+				int below = from + width;
 
 				// Only supported water spreads sideways
 				// This keeps falling drops from dispersing in midair
-				bool supported = from / GRID_WIDTH == GRID_HEIGHT - 1 ||
+				bool supported = from / width == height - 1 ||
 					!isOpen(below) ||
 					sideways[below] >= 1.0f - minTransfer;
 
@@ -182,7 +206,7 @@ void World::updateWater()
 	waterMass.swap(next);
 
 	// Keep material labels consistent with the new amounts
-	for (int index = 0; index < GRID_WIDTH * GRID_HEIGHT; ++index)
+	for (int index = 0; index < width * height; ++index)
 	{
 		if (isOpen(index))
 		{
@@ -193,12 +217,12 @@ void World::updateWater()
 
 void World::placeMaterial(int x, int y, Material material)
 {
-	if (x < 0 || x >= GRID_WIDTH || y < 0 || y >= GRID_HEIGHT)
+	if (x < 0 || x >= width || y < 0 || y >= height)
 	{
 		return;
 	}
 
-	int index = y * GRID_WIDTH + x;
+	int index = y * width + x;
 
 	if (material == Material::Water)
 	{

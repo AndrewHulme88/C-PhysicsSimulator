@@ -1,13 +1,23 @@
 #pragma once
 
 #include <vector>
+#include <random>
+#include <cstdint>
+#include <cstddef>
+
 #include "Material.h"
 
 class World
 {
 public:
-	static constexpr int GRID_WIDTH = 200;
-	static constexpr int GRID_HEIGHT = 150;
+	explicit World(
+		int width = 200,
+		int height = 150,
+		std::uint32_t seed = 12345u
+	);
+
+	int getWidth() const { return width; }
+	int getHeight() const { return height; }
 
 	// Advance the simulation by one step
 	void update();
@@ -15,7 +25,6 @@ public:
 	// Set the cell at grid position (x, y). Out-of-bounds positions are ignored.
 	void placeMaterial(int x, int y, Material material);
 
-	// Read-only access to the grid (e.g. for rendering)
 	const std::vector<Material>& getCells() const;
 
 	const std::vector<float>& getWaterMass() const
@@ -24,9 +33,16 @@ public:
 	}
 
 private:
-	std::vector<Material> cells = std::vector<Material>(GRID_WIDTH * GRID_HEIGHT, Material::Empty);
+	int width;
+	int height;
 
-	std::vector<float> waterMass = std::vector<float>(GRID_WIDTH * GRID_HEIGHT, 0.0f);
+	std::mt19937 rng;
+
+	std::vector<Material> cells;
+	std::vector<float> waterMass;
+
+	bool inBounds(int x, int y) const;
+	std::size_t indexOf(int x, int y) const;
 
 	void updateWater();
 };

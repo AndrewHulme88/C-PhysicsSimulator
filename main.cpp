@@ -6,12 +6,12 @@
 #include "Material.h"
 #include "World.h"
 
-// Grid size lives in World.h so main.cpp and World.cpp always agree
-constexpr int GRID_WIDTH = World::GRID_WIDTH;
-constexpr int GRID_HEIGHT = World::GRID_HEIGHT;
+// The sandbox chooses the size of the world it creates
+constexpr int width = 200;
+constexpr int GRID_HEIGHT = 150;
 constexpr int CELL_SIZE = 4;
 constexpr int TOOLBAR_HEIGHT = 48;
-constexpr int WINDOW_WIDTH = GRID_WIDTH * CELL_SIZE;
+constexpr int WINDOW_WIDTH = width * CELL_SIZE;
 constexpr int WINDOW_HEIGHT = GRID_HEIGHT * CELL_SIZE + TOOLBAR_HEIGHT;
 constexpr double FIXED_TIMESTAMP = 1.0 / 60.0;
 
@@ -35,9 +35,9 @@ void renderGrid(SDL_Renderer* renderer,
 {
 	for (int y = 0; y < GRID_HEIGHT; y++)
 	{
-		for (int x = 0; x < GRID_WIDTH; x++)
+		for (int x = 0; x < width; x++)
 		{
-			int index = y * GRID_WIDTH + x;
+			int index = y * width + x;
 
 			switch (grid[index])
 			{
@@ -137,7 +137,7 @@ void renderToolbar(SDL_Renderer* renderer, Material selectedMaterial)
 
 int main(int argc, char *argv[])
 {
-	World world;
+	World world(width, GRID_HEIGHT, 12345u);
 
 	for (int x = 40; x <= 70; ++x)
 	{
