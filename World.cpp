@@ -44,9 +44,8 @@ void World::update()
 			int x = scanLeftToRight ? i : (width - 1 - i);
 			int index = y * width + x;
 
-			// Sand
-			// Only apply gravity to sand, skip the bottom row
-			if (cells[index] == Material::Sand && y + 1 < height)
+			// Powder type material physics
+			if (definition(cells[index]).movement == MovementType::Powder && y + 1 < height)
 			{
 				auto tryMoveSand = [&](int targetX) -> bool
 				{
@@ -217,18 +216,19 @@ void World::updateWater()
 
 void World::placeMaterial(int x, int y, Material material)
 {
-	if (x < 0 || x >= width || y < 0 || y >= height)
+	if (!inBounds(x, y))
 	{
 		return;
 	}
 
-	int index = y * width + x;
+	const auto index = indexOf(x, y);
 
 	if (material == Material::Water)
 	{
-		// Water can't be pointed inside a solid
-		// ------------ Will need to be changed if more solid materials are added ------------
-		if (cells[index] == Material::Sand || cells[index] == Material::Stone)
+		const auto targetMovement = definition(cells[index]).movement;
+
+		// Water cannot be placed inside solids or powders
+		if (targetMovement == MovementType::Solid || targetMovement == MovementType::Powder)
 		{
 			return;
 		}
