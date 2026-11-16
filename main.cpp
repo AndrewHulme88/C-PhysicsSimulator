@@ -30,8 +30,7 @@ const MaterialButton materialButtons[] = {
 };
 
 void renderGrid(SDL_Renderer* renderer, 
-	const std::vector<Material>& grid, 
-	const std::vector<float>& waterMass)
+	const std::vector<Cell>& grid)
 {
 	for (int y = 0; y < GRID_HEIGHT; y++)
 	{
@@ -39,7 +38,7 @@ void renderGrid(SDL_Renderer* renderer,
 		{
 			int index = y * width + x;
 
-			switch (grid[index])
+			switch (grid[index].material)
 			{
 			case Material::Empty:
 				continue;
@@ -64,9 +63,9 @@ void renderGrid(SDL_Renderer* renderer,
 				static_cast<float>(CELL_SIZE)
 			};
 
-			if (grid[index] == Material::Water)
+			if (grid[index].material == Material::Water)
 			{
-				float fill = std::clamp(waterMass[index], 0.0f, 1.0f);
+				float fill = std::clamp(grid[index].amount, 0.0f, 1.0f);
 
 				rect.h = CELL_SIZE * fill;
 				rect.y += CELL_SIZE - rect.h; // Fill upward from the cell bottom
@@ -256,7 +255,7 @@ int main(int argc, char *argv[])
 		SDL_RenderClear(renderer);
 
 		SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-		renderGrid(renderer, world.getCells(), world.getWaterMass());
+		renderGrid(renderer, world.getCells());
 		renderToolbar(renderer, selectedMaterial);
 		SDL_RenderPresent(renderer);
 	}

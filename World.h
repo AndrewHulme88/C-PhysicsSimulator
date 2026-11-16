@@ -25,12 +25,7 @@ public:
 	// Set the cell at grid position (x, y). Out-of-bounds positions are ignored.
 	void placeMaterial(int x, int y, Material material);
 
-	const std::vector<Material>& getCells() const;
-
-	const std::vector<float>& getWaterMass() const
-	{
-		return waterMass;
-	}
+	const std::vector<Cell>& getCells() const;
 
 private:
 	int width;
@@ -38,8 +33,7 @@ private:
 
 	std::mt19937 rng;
 
-	std::vector<Material> cells;
-	std::vector<float> waterMass;
+	std::vector<Cell> cells;
 
 	bool inBounds(int x, int y) const;
 	std::size_t indexOf(int x, int y) const;

@@ -15,8 +15,7 @@ World::World(int width, int height, std::uint32_t seed)
 
 	const auto count = static_cast<std::size_t>(width) * height;
 
-	cells.resize(count, Material::Empty);
-	waterMass.resize(count, 0.0f);
+	cells.resize(count);
 }
 
 bool World::inBounds(int x, int y) const
@@ -45,7 +44,7 @@ void World::update()
 			int index = y * width + x;
 
 			// Powder type material physics
-			if (definition(cells[index]).movement == MovementType::Powder && y + 1 < height)
+			if (definition(cells[index].material).movement == MovementType::Powder && y + 1 < height)
 			{
 				auto tryMoveSand = [&](int targetX) -> bool
 				{
@@ -56,8 +55,8 @@ void World::update()
 
 					int target = (y + 1) * width + targetX;
 
-					if (cells[target] != Material::Empty &&
-						cells[target] != Material::Water)
+					if (cells[target].material != Material::Empty &&
+						cells[target].material != Material::Water)
 					{
 						return false;
 					}
@@ -65,7 +64,6 @@ void World::update()
 					// Move sand into the destination and bring whatever was
 					// there including its water amount into the old sand cell
 					std::swap(cells[index], cells[target]);
-					std::swap(waterMass[index], waterMass[target]);
 
 					return true;
 				};
@@ -96,12 +94,21 @@ void World::updateWater()
 	constexpr float minTransfer = 0.00001f;
 	constexpr int LEVELING_PASSES = 12;
 
-	auto next = waterMass;
-	auto remaining = waterMass;
+	std::vector<float> next(cells.size(), 0.0f);
+
+	for (std::size_t index = 0; index < cells.size(); ++index)
+	{
+		if (cells[index].material == Material::Water)
+		{
+			next[index] = cells[index].amount;
+		}
+	}
+
+	auto remaining = next;
 
 	auto isOpen = [&](int index)
 	{
-		return cells[index] == Material::Empty || cells[index] == Material::Water;
+		return cells[index].material == Material::Empty || cells[index].material == Material::Water;
 	};
 
 	// Given the combined water in two vertically adjacent cells
@@ -202,14 +209,21 @@ void World::updateWater()
 		}
 	}
 
-	waterMass.swap(next);
-
-	// Keep material labels consistent with the new amounts
+	// Store the calculated water amounts back in the cells
 	for (int index = 0; index < width * height; ++index)
 	{
-		if (isOpen(index))
+		if (!isOpen(index))
 		{
-			cells[index] = waterMass[index] > 0.0f ? Material::Water : Material::Empty;
+			continue;
+		}
+
+		if (next[index] > 0.0f)
+		{
+			cells[index] = Cell{ Material::Water, next[index] };
+		}
+		else
+		{
+			cells[index] = Cell{};
 		}
 	}
 }
@@ -221,11 +235,11 @@ void World::placeMaterial(int x, int y, Material material)
 		return;
 	}
 
-	const auto index = indexOf(x, y);
+	auto& cell = cells[indexOf(x, y)];
 
 	if (material == Material::Water)
 	{
-		const auto targetMovement = definition(cells[index]).movement;
+		const auto targetMovement = definition(cell.material).movement;
 
 		// Water cannot be placed inside solids or powders
 		if (targetMovement == MovementType::Solid || targetMovement == MovementType::Powder)
@@ -233,19 +247,17 @@ void World::placeMaterial(int x, int y, Material material)
 			return;
 		}
 
-		// Fill the cell without removing existing compressed water
-		waterMass[index] = std::max(waterMass[index], 1.0f);
+		// Fill the cell while preserving compressed water
+		cell = Cell{ Material::Water, std::max(cell.amount, 1.0f) };
 	}
 	else
 	{
-		// Replacing water with another material removes its water
-		waterMass[index] = 0.0f;
+		// Empty cells contain nothing. Solids and powders use 1
+		cell = Cell{ material, material == Material::Empty ? 0.0f : 1.0f };
 	}
-
-	cells[index] = material;
 }
 
-const std::vector<Material>& World::getCells() const
+const std::vector<Cell>& World::getCells() const
 {
 	return cells;
 }
