@@ -28,7 +28,63 @@ std::size_t World::indexOf(int x, int y) const
 	return static_cast<std::size_t>(y) * width + x;
 }
 
+void World::replaceCell(
+	std::size_t index,
+	Material material,
+	float amount
+)
+{
+	if (material == Material::Empty)
+	{
+		cells[index] = Cell{};
+		return;
+	}
+
+	const bool isLiquid = definition(material).movement == MovementType::Liquid;
+
+	cells[index] = Cell{ material, isLiquid ? amount : 1.0f };
+}
+
+bool World::tryDisplace(std::size_t from, std::size_t to)
+{
+	if (from == to)
+	{
+		return false;
+	}
+
+	const auto& moving = definition(cells[from].material);
+	const auto& target = definition(cells[to].material);
+
+	// Only powders and liquids use this displacement rule
+	if (moving.movement != MovementType::Powder &&
+		moving.movement != MovementType::Liquid)
+	{
+		return false;
+	}
+
+	const bool targetIsEmpty = cells[to].material == Material::Empty;
+	
+	const bool targetIsLighterLiquid =
+		target.movement == MovementType::Liquid &&
+		moving.density > target.density;
+
+	if (!targetIsEmpty && !targetIsLighterLiquid)
+	{
+		return false;
+	}
+
+	std::swap(cells[from], cells[to]);
+
+	return true;
+ }
+
 void World::update()
+{
+	updatePowders();
+	updateWater();
+}
+
+void World::updatePowders()
 {
 	// Random generator so it isn't re-seaded every frame
 	std::uniform_int_distribution<int> coinFlip(0, 1);
@@ -48,24 +104,12 @@ void World::update()
 			{
 				auto tryMoveSand = [&](int targetX) -> bool
 				{
-					if (targetX < 0 || targetX >= width)
-					{
-						return false;
-					}
+						if (!inBounds(targetX, y + 1))
+						{
+							return false;
+						}
 
-					int target = (y + 1) * width + targetX;
-
-					if (cells[target].material != Material::Empty &&
-						cells[target].material != Material::Water)
-					{
-						return false;
-					}
-
-					// Move sand into the destination and bring whatever was
-					// there including its water amount into the old sand cell
-					std::swap(cells[index], cells[target]);
-
-					return true;
+						return tryDisplace(index, indexOf(targetX, y + 1));
 				};
 
 				// Prefer falling straight down, including through water
@@ -84,8 +128,6 @@ void World::update()
 			}
 		}
 	}
-
-	updateWater();
 }
 
 void World::updateWater()
@@ -219,11 +261,11 @@ void World::updateWater()
 
 		if (next[index] > 0.0f)
 		{
-			cells[index] = Cell{ Material::Water, next[index] };
+			replaceCell(index, Material::Water, next[index]);
 		}
 		else
 		{
-			cells[index] = Cell{};
+			replaceCell(index, Material::Empty);
 		}
 	}
 }
@@ -235,11 +277,11 @@ void World::placeMaterial(int x, int y, Material material)
 		return;
 	}
 
-	auto& cell = cells[indexOf(x, y)];
+	const auto index = indexOf(x, y);
 
 	if (material == Material::Water)
 	{
-		const auto targetMovement = definition(cell.material).movement;
+		const auto targetMovement = definition(cells[index].material).movement;
 
 		// Water cannot be placed inside solids or powders
 		if (targetMovement == MovementType::Solid || targetMovement == MovementType::Powder)
@@ -247,13 +289,15 @@ void World::placeMaterial(int x, int y, Material material)
 			return;
 		}
 
-		// Fill the cell while preserving compressed water
-		cell = Cell{ Material::Water, std::max(cell.amount, 1.0f) };
+		replaceCell(
+			index,
+			material,
+			std::max(cells[index].amount, 1.0f)
+		);
 	}
 	else
 	{
-		// Empty cells contain nothing. Solids and powders use 1
-		cell = Cell{ material, material == Material::Empty ? 0.0f : 1.0f };
+		replaceCell(index, material);
 	}
 }
 

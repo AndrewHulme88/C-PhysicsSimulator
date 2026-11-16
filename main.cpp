@@ -3,6 +3,8 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <chrono>
+
 #include "Material.h"
 #include "World.h"
 
@@ -13,7 +15,7 @@ constexpr int CELL_SIZE = 4;
 constexpr int TOOLBAR_HEIGHT = 48;
 constexpr int WINDOW_WIDTH = width * CELL_SIZE;
 constexpr int WINDOW_HEIGHT = GRID_HEIGHT * CELL_SIZE + TOOLBAR_HEIGHT;
-constexpr double FIXED_TIMESTAMP = 1.0 / 60.0;
+constexpr double FIXED_TIMESTEP = 1.0 / 60.0;
 
 struct MaterialButton
 {
@@ -179,9 +181,26 @@ int main(int argc, char *argv[])
 	bool isDrawing = false;
 	bool running = true;
 	SDL_Event event;
+
+	using Clock = std::chrono::steady_clock;
+
+	auto previousTime = Clock::now();
+	double accumelator = 0.0;
 	
 	while (running)
 	{
+		const auto currentTime = Clock::now();
+
+		const double elapsed =
+			std::chrono::duration<double>(
+				currentTime - previousTime
+			).count();
+
+		previousTime = currentTime;
+
+		// Avoid excessive catch up after a long pause
+		accumelator += std::min(elapsed, 0.25);
+
 		while (SDL_PollEvent(&event))
 		{
 			switch (event.type)
@@ -246,10 +265,11 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		SDL_Delay(static_cast<Uint32>(FIXED_TIMESTAMP * 1000)); // ~60 FPS cap (SDL_Delay takes milliseconds)
-
-		// Update physics
-		world.update();
+		while (accumelator >= FIXED_TIMESTEP)
+		{
+			world.update();
+			accumelator -= FIXED_TIMESTEP;
+		}
 
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 		SDL_RenderClear(renderer);

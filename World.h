@@ -38,5 +38,14 @@ private:
 	bool inBounds(int x, int y) const;
 	std::size_t indexOf(int x, int y) const;
 
+	void replaceCell(
+		std::size_t index,
+		Material material,
+		float amount = 1.0f
+	);
+
+	bool tryDisplace(std::size_t from, std::size_t to);
+
+	void updatePowders();
 	void updateWater();
 };
