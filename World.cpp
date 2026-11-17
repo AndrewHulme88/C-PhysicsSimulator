@@ -81,7 +81,7 @@ bool World::tryDisplace(std::size_t from, std::size_t to)
 void World::update()
 {
 	updatePowders();
-	updateWater();
+	updateLiquid(Material::Water);
 }
 
 void World::updatePowders()
@@ -130,7 +130,7 @@ void World::updatePowders()
 	}
 }
 
-void World::updateWater()
+void World::updateLiquid(Material material)
 {
 	constexpr float compression = 0.02f;
 	constexpr float minTransfer = 0.00001f;
@@ -140,7 +140,7 @@ void World::updateWater()
 
 	for (std::size_t index = 0; index < cells.size(); ++index)
 	{
-		if (cells[index].material == Material::Water)
+		if (cells[index].material == material)
 		{
 			next[index] = cells[index].amount;
 		}
@@ -150,7 +150,7 @@ void World::updateWater()
 
 	auto isOpen = [&](int index)
 	{
-		return cells[index].material == Material::Empty || cells[index].material == Material::Water;
+		return cells[index].material == Material::Empty || cells[index].material == material;
 	};
 
 	// Given the combined water in two vertically adjacent cells
@@ -231,7 +231,7 @@ void World::updateWater()
 					continue;
 				}
 
-				float flow = (sideways[left] - sideways[right]) * 0.25f;
+				float flow = (sideways[left] - sideways[right]) * definition(material).sidewaysFlow;
 				int from = flow > 0.0f ? left : right;
 				int below = from + width;
 
@@ -261,7 +261,7 @@ void World::updateWater()
 
 		if (next[index] > 0.0f)
 		{
-			replaceCell(index, Material::Water, next[index]);
+			replaceCell(index, material, next[index]);
 		}
 		else
 		{

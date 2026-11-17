@@ -47,5 +47,5 @@ private:
 	bool tryDisplace(std::size_t from, std::size_t to);
 
 	void updatePowders();
-	void updateWater();
+	void updateLiquid(Material material);
 };
