@@ -82,6 +82,7 @@ void World::update()
 {
 	updatePowders();
 	updateLiquid(Material::Water);
+	updateLiquid(Material::Oil);
 }
 
 void World::updatePowders()
@@ -279,12 +280,12 @@ void World::placeMaterial(int x, int y, Material material)
 
 	const auto index = indexOf(x, y);
 
-	if (material == Material::Water)
+	if (definition(material).movement == MovementType::Liquid)
 	{
-		const auto targetMovement = definition(cells[index].material).movement;
+		const auto existing = cells[index].material;
 
-		// Water cannot be placed inside solids or powders
-		if (targetMovement == MovementType::Solid || targetMovement == MovementType::Powder)
+		// Liquid placement fills empty cells or the same liquid
+		if (existing != Material::Empty && existing != material)
 		{
 			return;
 		}

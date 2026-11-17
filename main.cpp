@@ -28,7 +28,8 @@ const MaterialButton materialButtons[] = {
 	{ Material::Empty, "Eraser",{ 8.0f, 8.0f, 100.0f, 32.0f } },
 	{ Material::Sand, "Sand",{ 116.0f, 8.0f, 100.0f, 32.0f } },
 	{ Material::Stone, "Stone",{ 224.0f, 8.0f, 100.0f, 32.0f } },
-	{ Material::Water, "Water",{ 322.0f, 8.0f, 100.0f, 32.0f } }
+	{ Material::Water, "Water",{ 322.0f, 8.0f, 100.0f, 32.0f } },
+	{ Material::Oil, "Oil", { 440.0f, 8.0f, 100.0f, 32.0f }}
 };
 
 void renderGrid(SDL_Renderer* renderer, 
@@ -56,6 +57,10 @@ void renderGrid(SDL_Renderer* renderer,
 			case Material::Water:
 				SDL_SetRenderDrawColor(renderer, 50, 130, 230, 255);
 				break;
+
+			case Material::Oil:
+				SDL_SetRenderDrawColor(renderer, 110, 85, 35, 255);
+				break;
 			}
 
 			SDL_FRect rect{
@@ -65,7 +70,7 @@ void renderGrid(SDL_Renderer* renderer,
 				static_cast<float>(CELL_SIZE)
 			};
 
-			if (grid[index].material == Material::Water)
+			if (definition(grid[index].material).movement == MovementType::Liquid)
 			{
 				float fill = std::clamp(grid[index].amount, 0.0f, 1.0f);
 
